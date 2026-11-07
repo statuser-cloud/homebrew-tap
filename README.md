@@ -1,4 +1,4 @@
-# Homebrew-тап Statuser
+# Statuser в Homebrew
 
 Это тап Homebrew организации Statuser. Через него ставится консольная утилита [statuser](https://github.com/statuser-cloud/cli) на macOS и Linux.
 
