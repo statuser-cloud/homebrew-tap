@@ -1,0 +1,79 @@
+name: Update formulas
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [cli-released]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-formulas
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - formula: statuser
+            repo: statuser-cloud/cli
+    env:
+      FORMULA: ${{ matrix.formula }}
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Update Formula/${{ matrix.formula }}.rb
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/update-formula.sh "$FORMULA" "${{ matrix.repo }}"
+
+      - name: Commit locally
+        id: commit
+        run: |
+          file="Formula/$FORMULA.rb"
+          if git diff --quiet -- "$file"; then
+            echo "No changes in $file"
+            exit 0
+          fi
+          version=$(sed -n 's|.*/releases/download/v\([^/]*\)/.*|\1|p' "$file" | head -n 1)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -m "$FORMULA $version"
+          echo "changed=true" >>"$GITHUB_OUTPUT"
+
+      # brew tap clones committed state, so this checks exactly what gets pushed.
+      - name: Tap the checkout
+        run: |
+          brew update --quiet
+          brew tap statuser-cloud/tap "$GITHUB_WORKSPACE"
+          brew trust statuser-cloud/tap
+
+      - name: Style and audit
+        run: |
+          brew style "statuser-cloud/tap/$FORMULA"
+          brew audit --strict --online --formula "statuser-cloud/tap/$FORMULA"
+
+      - name: Install and test
+        run: |
+          brew install "statuser-cloud/tap/$FORMULA"
+          brew test "statuser-cloud/tap/$FORMULA"
+          "$FORMULA" --version
+          "$FORMULA" completion zsh | head -1
+          test -f "$(brew --prefix)/share/zsh/site-functions/_$FORMULA"
+
+      - name: Push
+        if: steps.commit.outputs.changed == 'true'
+        run: |
+          git pull --rebase origin main
+          git push origin HEAD:main
