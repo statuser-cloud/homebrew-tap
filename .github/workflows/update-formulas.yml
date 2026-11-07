@@ -1,6 +1,6 @@
 name: Update formulas
 
-# Follows the releases of each formula's repository: every six hours (and by
+# Follows the releases of each formula's repository: every hour (and by
 # hand) the latest release tag is compared with Formula/<name>.rb; on a new
 # one the version and checksums are rewritten from its SHA256SUMS, and the
 # change is pushed only after brew audit, install and brew test pass.
@@ -11,7 +11,7 @@ name: Update formulas
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
   repository_dispatch:
     types: [cli-released]
@@ -62,18 +62,23 @@ jobs:
           echo "changed=true" >>"$GITHUB_OUTPUT"
 
       # brew tap clones committed state, so this checks exactly what gets pushed.
+      # An hourly run with no new release stops before: nothing to check. A
+      # manual run checks the formula even when it is unchanged.
       - name: Tap the checkout
+        if: steps.commit.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           brew update --quiet
           brew tap statuser-cloud/tap "$GITHUB_WORKSPACE"
           brew trust statuser-cloud/tap
 
       - name: Style and audit
+        if: steps.commit.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           brew style "statuser-cloud/tap/$FORMULA"
           brew audit --strict --online --formula "statuser-cloud/tap/$FORMULA"
 
       - name: Install and test
+        if: steps.commit.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           brew install "statuser-cloud/tap/$FORMULA"
           brew test "statuser-cloud/tap/$FORMULA"
