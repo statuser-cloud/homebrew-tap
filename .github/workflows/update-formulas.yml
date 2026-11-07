@@ -1,5 +1,14 @@
 name: Update formulas
 
+# Follows the releases of each formula's repository: every six hours (and by
+# hand) the latest release tag is compared with Formula/<name>.rb; on a new
+# one the version and checksums are rewritten from its SHA256SUMS, and the
+# change is pushed only after brew audit, install and brew test pass.
+#
+# Formulas live in Formula/<name>.rb, casks in Casks/<name>.rb. A new formula
+# joins this by a line in the matrix below, if its releases publish
+# SHA256SUMS and archives <name>-<macos|linux>-<arm64|x64>.tar.gz.
+
 on:
   schedule:
     - cron: "17 */6 * * *"
